@@ -144,14 +144,6 @@ GET /search?q=budget+smartphone+under+15000&top_n=5
 
 ---
 
-## 🧠 Interview Talking Points
-
-- **"How does your recommendation work?"** → TF-IDF converts text to vectors, cosine similarity measures relevance between query and product descriptions
-- **"Why not use an LLM?"** → Rule-based explainer is faster, free, and fully explainable — no black box
-- **"How is it secure?"** → Rate limiting prevents abuse, input sanitizer blocks injections, secure headers prevent XSS
-- **"How would you scale it?"** → Replace JSON with PostgreSQL, use FAISS for vector search at scale
-
----
 
 ## 👨‍💻 Built by
 
