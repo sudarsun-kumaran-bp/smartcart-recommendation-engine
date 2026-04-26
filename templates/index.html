@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartCart — AI Product Recommender</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f5f7fa; color: #1a1a2e; min-height: 100vh; }
+
+  header { background: #1a1a2e; color: white; padding: 18px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 22px; font-weight: 600; }
+  header span { font-size: 13px; color: #aaa; margin-left: auto; }
+
+  .hero { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 48px 24px 40px; text-align: center; }
+  .hero h2 { font-size: 28px; font-weight: 700; margin-bottom: 10px; }
+  .hero p { font-size: 15px; color: #ccc; margin-bottom: 28px; }
+
+  .search-box { display: flex; gap: 10px; max-width: 640px; margin: 0 auto; }
+  .search-box input { flex: 1; padding: 14px 18px; border-radius: 10px; border: none; font-size: 15px; outline: none; }
+  .search-box button { padding: 14px 24px; background: #e94560; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .search-box button:hover { background: #c73652; }
+
+  .suggestions { max-width: 640px; margin: 12px auto 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip { background: rgba(255,255,255,0.1); color: #ddd; border: 1px solid rgba(255,255,255,0.2); padding: 5px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+  .chip:hover { background: rgba(255,255,255,0.2); color: white; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+  .status { text-align: center; padding: 20px; font-size: 15px; color: #666; }
+  .loading { color: #e94560; }
+
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .results-header h3 { font-size: 18px; font-weight: 600; }
+  .results-header span { font-size: 13px; color: #888; }
+
+  .product-card { background: white; border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid #e94560; transition: transform 0.2s; }
+  .product-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.1); }
+
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .product-name { font-size: 16px; font-weight: 600; color: #1a1a2e; flex: 1; margin-right: 16px; }
+  .match-badge { background: #e8f5e9; color: #2e7d32; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
+
+  .card-meta { display: flex; gap: 16px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+  .price { font-size: 20px; font-weight: 700; color: #e94560; }
+  .rating { font-size: 13px; color: #f59e0b; font-weight: 600; }
+  .brand { font-size: 13px; color: #666; background: #f0f0f0; padding: 3px 10px; border-radius: 12px; }
+  .category { font-size: 13px; color: #666; background: #f0f0f0; padding: 3px 10px; border-radius: 12px; }
+
+  .explanation { font-size: 13px; color: #444; background: #f8f9ff; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; line-height: 1.6; border-left: 3px solid #7c83fd; }
+
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 11px; color: #555; background: #f0f4ff; padding: 3px 10px; border-radius: 12px; }
+
+  .no-results { text-align: center; padding: 48px 24px; }
+  .no-results h3 { font-size: 20px; color: #333; margin-bottom: 8px; }
+  .no-results p { color: #888; font-size: 14px; }
+
+  .rank { font-size: 13px; font-weight: 700; color: #aaa; margin-bottom: 6px; }
+  .rank.gold { color: #f59e0b; }
+  .rank.silver { color: #94a3b8; }
+  .rank.bronze { color: #cd7c3a; }
+</style>
+</head>
+<body>
+
+<header>
+  <span>🛒</span>
+  <h1>SmartCart</h1>
+  <span>AI-Powered Product Recommender</span>
+</header>
+
+<div class="hero">
+  <h2>Find the perfect product</h2>
+  <p>Search in plain English — "best earphones under ₹1000" or "gaming laptop with good battery"</p>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="What are you looking for?" autocomplete="off" />
+    <button onclick="doSearch()">Search</button>
+  </div>
+  <div class="suggestions">
+    <span class="chip" onclick="quickSearch('wireless earphones under 1000')">🎧 Earphones under ₹1000</span>
+    <span class="chip" onclick="quickSearch('gaming laptop RTX')">💻 Gaming Laptop</span>
+    <span class="chip" onclick="quickSearch('budget smartphone under 15000')">📱 Budget Phone</span>
+    <span class="chip" onclick="quickSearch('smartwatch with calling feature')">⌚ Smartwatch</span>
+    <span class="chip" onclick="quickSearch('portable bluetooth speaker outdoor')">🔊 Bluetooth Speaker</span>
+    <span class="chip" onclick="quickSearch('power bank 20000mAh')">🔋 Power Bank</span>
+  </div>
+</div>
+
+<div class="container">
+  <div id="output" class="status">
+    👆 Type a search query above to get AI-powered recommendations
+  </div>
+</div>
+
+<script>
+  const input = document.getElementById('searchInput');
+  input.addEventListener('keypress', e => { if (e.key === 'Enter') doSearch(); });
+
+  function quickSearch(query) {
+    input.value = query;
+    doSearch();
+  }
+
+  async function doSearch() {
+    const query = input.value.trim();
+    if (!query) return;
+
+    const output = document.getElementById('output');
+    output.innerHTML = '<div class="status loading">🔍 Searching for the best products...</div>';
+
+    try {
+      const res = await fetch(`/search?q=${encodeURIComponent(query)}&top_n=5`);
+
+      if (res.status === 429) {
+        output.innerHTML = '<div class="status">⚠️ Too many requests. Please wait a moment.</div>';
+        return;
+      }
+      if (res.status === 400) {
+        const err = await res.json();
+        output.innerHTML = `<div class="status">❌ ${err.detail}</div>`;
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!data.results || data.results.length === 0) {
+        output.innerHTML = `
+          <div class="no-results">
+            <h3>No products found</h3>
+            <p>Try different keywords or remove price filters</p>
+          </div>`;
+        return;
+      }
+
+      const rankLabels = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+      const rankClasses = ['gold', 'silver', 'bronze', '', ''];
+
+      let html = `
+        <div class="results-header">
+          <h3>Results for "${data.query}"</h3>
+          <span>${data.total_results} products found</span>
+        </div>`;
+
+      data.results.forEach((p, i) => {
+        const stars = '★'.repeat(Math.floor(p.rating)) + '☆'.repeat(5 - Math.floor(p.rating));
+        const tagsHtml = p.tags.slice(0, 5).map(t => `<span class="tag">${t}</span>`).join('');
+        html += `
+          <div class="product-card">
+            <div class="rank ${rankClasses[i]}">${rankLabels[i]} Rank #${i + 1}</div>
+            <div class="card-top">
+              <div class="product-name">${p.name}</div>
+              <div class="match-badge">${p.match_score}% match</div>
+            </div>
+            <div class="card-meta">
+              <span class="price">₹${p.price.toLocaleString('en-IN')}</span>
+              <span class="rating">${stars} ${p.rating}</span>
+              <span class="brand">${p.brand}</span>
+              <span class="category">${p.category}</span>
+            </div>
+            <div class="explanation">💡 ${p.explanation}</div>
+            <div class="tags">${tagsHtml}</div>
+          </div>`;
+      });
+
+      output.innerHTML = html;
+
+    } catch (err) {
+      output.innerHTML = '<div class="status">❌ Something went wrong. Make sure the server is running.</div>';
+    }
+  }
+</script>
+</body>
+</html>
