@@ -65,35 +65,45 @@
 <body>
 
 <header>
-  <span>🛒</span>
   <h1>SmartCart</h1>
   <span>AI-Powered Product Recommender</span>
 </header>
 
 <div class="hero">
   <h2>Find the perfect product</h2>
-  <p>Search in plain English — "best earphones under ₹1000" or "gaming laptop with good battery"</p>
+  <p>Search in plain English — "best earphones under 1000" or "gaming laptop with good battery"</p>
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="What are you looking for?" autocomplete="off" />
     <button onclick="doSearch()">Search</button>
   </div>
   <div class="suggestions">
-    <span class="chip" onclick="quickSearch('wireless earphones under 1000')">🎧 Earphones under ₹1000</span>
-    <span class="chip" onclick="quickSearch('gaming laptop RTX')">💻 Gaming Laptop</span>
-    <span class="chip" onclick="quickSearch('budget smartphone under 15000')">📱 Budget Phone</span>
-    <span class="chip" onclick="quickSearch('smartwatch with calling feature')">⌚ Smartwatch</span>
-    <span class="chip" onclick="quickSearch('portable bluetooth speaker outdoor')">🔊 Bluetooth Speaker</span>
-    <span class="chip" onclick="quickSearch('power bank 20000mAh')">🔋 Power Bank</span>
+    <span class="chip" onclick="quickSearch('wireless earphones under 1000')">Earphones under 1000</span>
+    <span class="chip" onclick="quickSearch('gaming laptop RTX')">Gaming Laptop</span>
+    <span class="chip" onclick="quickSearch('budget smartphone under 15000')">Budget Phone</span>
+    <span class="chip" onclick="quickSearch('smartwatch with calling feature')">Smartwatch</span>
+    <span class="chip" onclick="quickSearch('portable bluetooth speaker outdoor')">Bluetooth Speaker</span>
+    <span class="chip" onclick="quickSearch('power bank 20000mAh')">Power Bank</span>
   </div>
 </div>
 
 <div class="container">
   <div id="output" class="status">
-    👆 Type a search query above to get AI-powered recommendations
+    Type a search query above to get AI-powered recommendations
   </div>
 </div>
 
 <script>
+  // XSS protection: escape HTML special characters
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   const input = document.getElementById('searchInput');
   input.addEventListener('keypress', e => { if (e.key === 'Enter') doSearch(); });
 
@@ -107,18 +117,19 @@
     if (!query) return;
 
     const output = document.getElementById('output');
-    output.innerHTML = '<div class="status loading">🔍 Searching for the best products...</div>';
+    output.innerHTML = '<div class="status loading">Searching for the best products...</div>';
 
     try {
       const res = await fetch(`/search?q=${encodeURIComponent(query)}&top_n=5`);
 
       if (res.status === 429) {
-        output.innerHTML = '<div class="status">⚠️ Too many requests. Please wait a moment.</div>';
+        output.innerHTML = '<div class="status warning">Too many requests. Please wait a moment.</div>';
         return;
       }
       if (res.status === 400) {
         const err = await res.json();
-        output.innerHTML = `<div class="status">❌ ${err.detail}</div>`;
+        const safeDetail = escapeHtml(err.detail || 'Bad request');
+        output.innerHTML = `<div class="status error">Error: ${safeDetail}</div>`;
         return;
       }
 
@@ -133,32 +144,36 @@
         return;
       }
 
-      const rankLabels = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+      const rankLabels = ['#1', '#2', '#3', '#4', '#5'];
       const rankClasses = ['gold', 'silver', 'bronze', '', ''];
 
       let html = `
         <div class="results-header">
-          <h3>Results for "${data.query}"</h3>
+          <h3>Results for "${escapeHtml(data.query)}"</h3>
           <span>${data.total_results} products found</span>
         </div>`;
 
       data.results.forEach((p, i) => {
         const stars = '★'.repeat(Math.floor(p.rating)) + '☆'.repeat(5 - Math.floor(p.rating));
-        const tagsHtml = p.tags.slice(0, 5).map(t => `<span class="tag">${t}</span>`).join('');
+        const safeName = escapeHtml(p.name);
+        const safeBrand = escapeHtml(p.brand);
+        const safeCategory = escapeHtml(p.category);
+        const safeExplanation = escapeHtml(p.explanation);
+        const tagsHtml = p.tags.slice(0, 5).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
         html += `
           <div class="product-card">
             <div class="rank ${rankClasses[i]}">${rankLabels[i]} Rank #${i + 1}</div>
             <div class="card-top">
-              <div class="product-name">${p.name}</div>
+              <div class="product-name">${safeName}</div>
               <div class="match-badge">${p.match_score}% match</div>
             </div>
             <div class="card-meta">
               <span class="price">₹${p.price.toLocaleString('en-IN')}</span>
               <span class="rating">${stars} ${p.rating}</span>
-              <span class="brand">${p.brand}</span>
-              <span class="category">${p.category}</span>
+              <span class="brand">${safeBrand}</span>
+              <span class="category">${safeCategory}</span>
             </div>
-            <div class="explanation">💡 ${p.explanation}</div>
+            <div class="explanation">${safeExplanation}</div>
             <div class="tags">${tagsHtml}</div>
           </div>`;
       });
@@ -166,7 +181,7 @@
       output.innerHTML = html;
 
     } catch (err) {
-      output.innerHTML = '<div class="status">❌ Something went wrong. Make sure the server is running.</div>';
+      output.innerHTML = '<div class="status error">Something went wrong. Make sure the server is running.</div>';
     }
   }
 </script>
