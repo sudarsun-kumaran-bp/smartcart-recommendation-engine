@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query, Depends, Request
+import logging
+from fastapi import APIRouter, Query, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 from app.core.recommender import search_products
 from app.core.security import sanitize_query, rate_limit_check
@@ -6,6 +7,10 @@ from app.database import get_db
 from app.models import Product
 from pydantic import BaseModel
 from typing import List, Optional
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -38,14 +43,17 @@ def search(
 ):
     """Search products using natural language. Results ranked by TF-IDF cosine similarity."""
     clean_query = sanitize_query(q)
-    results = search_products(clean_query, db=db, top_n=top_n)
+    try:
+        results = search_products(clean_query, db=db, top_n=top_n)
+    except Exception as e:
+        logger.error(f"Search failed for query '{clean_query}': {e}")
+        raise HTTPException(status_code=500, detail="Internal search error")
     return {"query": clean_query, "total_results": len(results), "results": results}
 
 
 @router.get("/categories")
 def get_categories(db: Session = Depends(get_db)):
     """Get all product categories from the database."""
-    # Pure SQL query via SQLAlchemy
     categories = db.query(Product.category).distinct().order_by(Product.category).all()
     return {"categories": [c[0] for c in categories]}
 
