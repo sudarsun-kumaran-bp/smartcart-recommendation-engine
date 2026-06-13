@@ -4,7 +4,9 @@ import time
 import re
 
 # ─── Rate Limiter ─────────────────────────────────────────────
-# Simple in-memory rate limiter: max 30 requests per minute per IP
+# Simple in-memory rate limiter: max 30 requests per minute per IP.
+# NOTE: This is per-process only. For production with multiple workers,
+# use a shared store like Redis.
 
 RATE_LIMIT = 30          # max requests
 RATE_WINDOW = 60         # per 60 seconds
@@ -30,16 +32,16 @@ def rate_limit_check(request: Request):
 
 # ─── Input Sanitizer ─────────────────────────────────────────
 MAX_QUERY_LENGTH = 200
+
+# Only block actual injection/XSS patterns, not legitimate words like "select"
 BLOCKED_PATTERNS = [
-    r'<script.*?>',        # XSS
-    r'javascript:',        # JS injection
-    r'SELECT.*FROM',       # SQL injection
-    r'DROP\s+TABLE',       # SQL drop
-    r'INSERT\s+INTO',      # SQL insert
-    r'--',                 # SQL comment
+    r'<script.*?>',        # XSS script tags
+    r'javascript:',        # JS injection in links
     r'\.\./\.\.',          # Path traversal
     r'eval\(',             # Code eval
     r'exec\(',             # Code exec
+    # SQL patterns are REMOVED because SQLAlchemy uses parameterized queries.
+    # Blocking "SELECT" would break legitimate queries like "select earphones".
 ]
 
 
@@ -56,7 +58,7 @@ def sanitize_query(query: str) -> str:
             detail=f"Query too long. Maximum {MAX_QUERY_LENGTH} characters allowed."
         )
 
-    # Check for injection patterns
+    # Check for remaining injection patterns
     for pattern in BLOCKED_PATTERNS:
         if re.search(pattern, query, re.IGNORECASE):
             raise HTTPException(
@@ -64,7 +66,7 @@ def sanitize_query(query: str) -> str:
                 detail="Invalid characters detected in query."
             )
 
-    # Strip HTML tags
+    # Strip HTML tags to prevent XSS (defense in depth)
     query = re.sub(r'<[^>]+>', '', query)
 
     return query
@@ -79,3 +81,14 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# ─── Optional: HTML escaping helper (for backend rendering, if ever used) ───
+def escape_html(text: str) -> str:
+    """Escape special characters for safe HTML output."""
+    return (text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#39;"))
